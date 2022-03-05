@@ -2,10 +2,10 @@ name: 执行定时任务
 
 on:
     # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#scheduled-events-schedule
-    # 每天每小时每30分
+    # 每小时1分执行定时任务
     # 分 时 天 月 星期
     schedule:
-        - cron: '26 * * * *'
+        - cron: '1 * * * *'
 
     workflow_dispatch:
 
