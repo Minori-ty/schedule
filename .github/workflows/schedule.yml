@@ -3,7 +3,7 @@ name: 执行定时任务
 on:
     # 每16小时执行一次定时任务
     schedule:
-        - cron: '59 * * * *'
+        - cron: '1 * * * * *'
 
     workflow_dispatch:
 
