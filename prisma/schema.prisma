@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// 动画模型
+model Anime {
+  id              Int        @id @default(autoincrement())
+  name            String     @db.VarChar(255)
+  alias           Json
+  description     String?    @db.Text
+  cover           String?    @db.VarChar(255)
+  startUpdateTime DateTime   @db.DateTime(0)
+  isSerializing   Boolean
+  isCompleted     Boolean
+  totalEpisodes   Int
+  currentEpisode  Int
+  episodes        Episode[]
+  schedules       Schedule[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([name])
+}
+
+model Episode {
+  id            Int      @id @default(autoincrement())
+  airDate       DateTime @db.Date
+  episodeNumber String
+  title         String   @db.VarChar(255) /// 集数名称
+  duration      Int? // 以秒为单位
+  /// 剧情介绍
+  synopsis      String?  @db.Text
+  /// 是否停更/跳过
+  isPostponed   Boolean?
+  /// 特殊情况备注
+  notes         String?  @db.Text
+  /// 视频链接
+  videoUrl      String?  @db.VarChar(255)
+  updatedAt     DateTime @updatedAt
+
+  anime   Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  animeId Int
+
+  @@index([animeId])
+}
+
+model Schedule {
+  id        Int      @id @default(autoincrement())
+  animeId   Int
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  platform  Json     @default("[\"哔哩哔哩\", \"网飞\"]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([animeId])
+}
