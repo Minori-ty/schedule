@@ -252,6 +252,7 @@
     ```json
     [
         {
+            "id": 1, // 动漫 ID
             "name": "进击的巨人",
             "episodeNumber": "1",
             "updateTime": "2023-01-01T00:00:00.000Z",
@@ -273,6 +274,7 @@
     ```json
     [
         {
+            "id": 1, // 动漫 ID
             "name": "进击的巨人",
             "episodeNumber": "1",
             "updateTime": "2023-01-01T00:00:00.000Z",

@@ -222,6 +222,7 @@ app.get('/schedule', async (req, res) => {
 
         const data = episodes.map((episode) => {
             return {
+                id: episode.anime.id,
                 name: episode.anime.name,
                 episodeNumber: episode.episodeNumber,
                 updateTime: episode.airDate,
@@ -259,7 +260,7 @@ app.get('/schedule-week', async (req, res) => {
                 },
             },
             include: {
-                anime: true, // 不包含 anime 信息
+                anime: true,
             },
             orderBy: {
                 airDate: 'asc',
@@ -268,6 +269,7 @@ app.get('/schedule-week', async (req, res) => {
 
         const data = episodes.map((episode) => {
             return {
+                id: episode.anime.id,
                 name: episode.anime.name,
                 episodeNumber: episode.episodeNumber,
                 updateTime: episode.airDate,
@@ -285,6 +287,7 @@ app.get('/schedule-week', async (req, res) => {
     }
 })
 
-app.listen(3000, () => {
-    console.log('run http://localhost:3000')
+const port = process.env.PORT || 8000
+app.listen(port, () => {
+    console.log(`run http://localhost:${port}`)
 })
