@@ -5,7 +5,7 @@ CREATE TABLE `Anime` (
     `alias` JSON NOT NULL,
     `description` TEXT NULL,
     `cover` VARCHAR(255) NULL,
-    `startUpdateTime` DATETIME(0) NOT NULL,
+    `startUpdateTime` INTEGER NOT NULL,
     `isSerializing` BOOLEAN NOT NULL,
     `isCompleted` BOOLEAN NOT NULL,
     `totalEpisodes` INTEGER NOT NULL,
@@ -20,10 +20,10 @@ CREATE TABLE `Anime` (
 -- CreateTable
 CREATE TABLE `Episode` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `airDate` DATE NOT NULL,
+    `airDate` INTEGER NOT NULL,
     `episodeNumber` VARCHAR(191) NOT NULL,
     `title` VARCHAR(255) NOT NULL,
-    `duration` INTEGER NULL,
+    `duration` INTEGER NULL DEFAULT 0,
     `synopsis` TEXT NULL,
     `isPostponed` BOOLEAN NULL,
     `notes` TEXT NULL,
