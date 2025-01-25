@@ -1,7 +1,8 @@
 import express, { Request } from 'express'
 import cors from 'cors'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
+import { winstonMiddleware } from './utils/logger'
 
 const prisma = new PrismaClient()
 
@@ -9,20 +10,51 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
-
+app.use(winstonMiddleware)
+// 获取动漫列表
 app.get('/anime', async (req, res) => {
-    const { page = 1, pageSize = 10 } = req.query
-    const anime = await prisma.anime.findMany({
-        skip: (Number(page) - 1) * Number(pageSize),
-        take: Number(pageSize),
-    })
-    // const list = anime.map((item) => {
-    //     return {
-    //         ...item,
-    //         startUpdateTime: dayjs(Number(item.startUpdateTime)).format('YYYY-MM-DD HH:mm'),
-    //     }
-    // })
-    res.json(anime)
+    const { page, pageSize, name } = req.query
+    let whereCondition: Prisma.AnimeWhereInput = {}
+
+    if (typeof name === 'string') {
+        whereCondition = {
+            OR: [{ name: { contains: name } }, { alias: { array_contains: name } }],
+        }
+    }
+    try {
+        const { anime, total } = await prisma.$transaction(
+            async (tx) => {
+                const total = await tx.anime.count({
+                    where: whereCondition,
+                })
+                const anime = await tx.anime.findMany({
+                    where: whereCondition,
+                    omit: {
+                        createdAt: true,
+                        updatedAt: true,
+                    },
+                    skip: page ? (Number(page) - 1) * Number(pageSize) : undefined,
+                    take: pageSize ? Number(pageSize) : undefined,
+                })
+                return { total, anime }
+            },
+            { isolationLevel: 'Serializable' }
+        )
+        res.json({
+            code: 200,
+            message: '获取动漫列表成功',
+            data: {
+                list: anime,
+                total,
+            },
+        })
+    } catch {
+        res.status(500).json({
+            code: 500,
+            message: '获取动漫列表失败',
+            data: null,
+        })
+    }
 })
 
 interface IAnime {
@@ -50,44 +82,49 @@ app.post('/anime', async (req: Request<{}, {}, IAnime>, res) => {
         currentEpisode,
     } = req.body
 
-    const anime = await prisma.anime.create({
-        data: {
-            name,
-            alias,
-            description,
-            cover,
-            startUpdateTime,
-            isSerializing,
-            isCompleted,
-            totalEpisodes,
-            currentEpisode,
+    const { anime } = await prisma.$transaction(
+        async (tx) => {
+            const anime = await tx.anime.create({
+                data: {
+                    name,
+                    alias,
+                    description,
+                    cover,
+                    startUpdateTime,
+                    isSerializing,
+                    isCompleted,
+                    totalEpisodes,
+                    currentEpisode,
+                },
+            })
+
+            for (let i = 1; i <= totalEpisodes; i++) {
+                const airDate = dayjs
+                    .unix(startUpdateTime)
+                    .add(i - 1, 'week')
+                    .unix()
+
+                await tx.episode.create({
+                    data: {
+                        animeId: anime.id,
+                        airDate: airDate,
+                        episodeNumber: i.toString(),
+                        title: `第${i}集`,
+                        duration: 24 * 60,
+                    },
+                })
+            }
+            if (isSerializing) {
+                await tx.schedule.create({
+                    data: {
+                        animeId: anime.id,
+                    },
+                })
+            }
+            return { anime }
         },
-    })
-
-    for (let i = 1; i <= totalEpisodes; i++) {
-        const airDate = dayjs
-            .unix(startUpdateTime)
-            .add(i - 1, 'week')
-            .unix()
-
-        await prisma.episode.create({
-            data: {
-                animeId: anime.id,
-                airDate: airDate,
-                episodeNumber: i.toString(),
-                title: `第${i}集`,
-                duration: 24 * 60,
-            },
-        })
-    }
-    if (isSerializing) {
-        await prisma.schedule.create({
-            data: {
-                animeId: anime.id,
-            },
-        })
-    }
-    console.log(anime)
+        { isolationLevel: 'Serializable' }
+    )
 
     res.json(anime)
 })
@@ -145,32 +182,6 @@ app.put('/anime-info/:id', async (req, res) => {
     res.json(anime)
 })
 
-// 搜索动漫
-app.get('/search-anime', async (req, res) => {
-    const { page = 1, pageSize = 10, name } = req.query
-    console.log(name)
-
-    const anime = await prisma.anime.findMany({
-        where: {
-            OR: [
-                {
-                    name: {
-                        contains: name as string,
-                    },
-                },
-                {
-                    alias: {
-                        array_contains: name,
-                    },
-                },
-            ],
-        },
-        skip: (Number(page) - 1) * Number(pageSize),
-        take: Number(pageSize),
-    })
-    res.json(anime)
-})
-
 interface IEpisode {
     id?: number
     title?: string
@@ -192,7 +203,7 @@ app.put('/episode/:animeId', async (req: Request<{ animeId: string }, {}, IEpiso
 })
 
 // 添加停更集数
-app.post('/episode-postponed/:animeId', async (req, res) => {
+app.post('/episode/postponed/:animeId', async (req, res) => {
     const { animeId } = req.params
     const { id } = req.body
     const episode = await prisma.episode.findUnique({
@@ -233,6 +244,55 @@ app.post('/episode-postponed/:animeId', async (req, res) => {
         })
     }
     res.json(newEpisode)
+})
+
+// 删除停更记录
+app.delete('/episode/postponed/:animeId', async (req, res) => {
+    const { animeId } = req.params
+    const { id } = req.body
+    const episode = await prisma.episode.findUnique({
+        where: {
+            animeId: Number(animeId),
+            id: Number(id),
+            isPostponed: true,
+        },
+    })
+    if (!episode) {
+        res.status(404).json({ error: '找不到该停更记录' })
+        return
+    }
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.episode.delete({
+                where: {
+                    id: episode.id,
+                },
+            })
+            const episodes = await tx.episode.findMany({
+                where: {
+                    animeId: Number(animeId),
+                    airDate: {
+                        gte: episode.airDate,
+                    },
+                },
+            })
+            for (const episode of episodes) {
+                await tx.episode.update({
+                    where: { id: episode.id },
+                    data: { airDate: dayjs.unix(episode.airDate).subtract(1, 'week').unix() },
+                })
+            }
+        })
+        res.json({
+            message: '删除停更记录成功',
+            code: 200,
+        })
+    } catch {
+        res.status(500).json({
+            message: '删除停更记录失败',
+            code: 500,
+        })
+    }
 })
 
 // 获取最近13天的动漫更新时间
@@ -330,6 +390,7 @@ app.get('/schedule-week', async (req, res) => {
 })
 
 const port = process.env.PORT || 8000
+
 app.listen(port, () => {
     console.log(`run http://localhost:${port}`)
 })
