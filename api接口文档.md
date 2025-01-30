@@ -379,7 +379,7 @@
 
 ## 添加停更集数
 
--   **URL:** `/episode-postponed/:animeId`
+-   **URL:** `/episode/postponed/:animeId`
 -   **方法:** POST
 -   **请求参数:**
     -   类型:
@@ -414,6 +414,34 @@
                 "notes": "本周停更，下一集将于2023-10-10 12:00播出。",
                 "isPostponed": true
             }
+        }
+        ```
+
+## 删除停更记录
+
+-   **URL:** `/episode/postponed/:animeId`
+-   **方法:** DELETE
+-   **请求参数:**
+    -   类型:
+        ```typescript
+        interface DeletePostponedEpisodeRequest {
+            animeId: number // 动漫的ID
+            id: number // 集数的ID
+        }
+        ```
+-   **返回数据:**
+    -   类型:
+        ```typescript
+        interface DeletePostponedEpisodeResponse {
+            message: string
+            code: number
+        }
+        ```
+    -   示例:
+        ```json
+        {
+            "message": "删除停更记录成功",
+            "code": 200
         }
         ```
 
